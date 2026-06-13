@@ -69,3 +69,23 @@ def add_points(line_user_id: str, points: int, eco_score: int, reason: str):
 def get_points_summary(line_user_id: str) -> dict:
     result = _call({"action": "getPointsSummary", "line_user_id": line_user_id})
     return result.get("data", {"boon_points": 0, "eco_score": 0, "total_bookings": 0})
+
+
+# ─── Sessions (การจอง 7 ขั้นตอน) ──────────────
+
+def get_session(line_user_id: str) -> dict | None:
+    result = _call({"action": "getSession", "line_user_id": line_user_id})
+    return result.get("data")
+
+
+def set_session(line_user_id: str, step: str, session_data: dict):
+    _call({
+        "action": "setSession",
+        "line_user_id": line_user_id,
+        "step": step,
+        "session_data": session_data
+    })
+
+
+def clear_session(line_user_id: str):
+    _call({"action": "clearSession", "line_user_id": line_user_id})
