@@ -8,6 +8,7 @@ from linebot.v3.webhooks import MessageEvent
 
 from config.constants import KEYWORDS, MERIT_PACKAGES
 from services.sheets_service import get_member, get_points_summary
+from handlers.booking_handler import start_booking
 from utils.flex_messages import (
     build_booking_menu_flex,
     build_points_flex,
@@ -76,19 +77,8 @@ def _handle_register_check(user_id, reply_token, line_bot_api):
 
 
 def _handle_booking_menu(user_id, reply_token, line_bot_api):
-    member = get_member(user_id)
-    if not member:
-        line_bot_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text="กรุณาสมัครสมาชิกก่อนนะคะ พิมพ์ 'สมัคร' เพื่อเริ่มต้น 🙏")],
-            )
-        )
-        return
-    flex = build_booking_menu_flex()
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    # เริ่มระบบจอง 7 ขั้นตอน
+    start_booking(user_id, reply_token, line_bot_api)
 
 
 def _handle_points(user_id, reply_token, line_bot_api):
