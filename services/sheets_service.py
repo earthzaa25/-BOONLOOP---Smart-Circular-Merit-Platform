@@ -95,7 +95,7 @@ def clear_session(line_user_id: str):
 
 def save_payment(line_user_id: str, booking_id: str, amount: float,
                  slip_amount: float, slip_datetime: str, slip_ref: str,
-                 auto_match: bool) -> str:
+                 auto_match: bool) -> dict:
     result = _call({
         "action": "savePayment",
         "line_user_id": line_user_id,
@@ -106,7 +106,7 @@ def save_payment(line_user_id: str, booking_id: str, amount: float,
         "slip_ref": slip_ref,
         "auto_match": auto_match,
     })
-    return result.get("payment_id")
+    return result
 
 
 def get_booking(booking_id: str) -> dict | None:
@@ -118,3 +118,31 @@ def get_latest_pending_booking(line_user_id: str) -> dict | None:
     """ดึงการจองล่าสุดที่ยังรอชำระเงินของผู้ใช้"""
     result = _call({"action": "getLatestPendingBooking", "line_user_id": line_user_id})
     return result.get("data")
+
+
+# ─── Phase 3: My Bookings / Return / Eco ──────
+
+def get_my_bookings(line_user_id: str) -> list:
+    result = _call({"action": "getMyBookings", "line_user_id": line_user_id})
+    return result.get("data", [])
+
+
+def cancel_booking(booking_id: str, line_user_id: str) -> dict:
+    return _call({"action": "cancelBooking", "booking_id": booking_id, "line_user_id": line_user_id})
+
+
+def get_returnable(line_user_id: str) -> list:
+    result = _call({"action": "getReturnable", "line_user_id": line_user_id})
+    return result.get("data", [])
+
+
+def return_equipment(booking_id: str, line_user_id: str, donate: bool) -> dict:
+    return _call({
+        "action": "returnEquipment", "booking_id": booking_id,
+        "line_user_id": line_user_id, "donate": donate
+    })
+
+
+def get_eco_stats(line_user_id: str) -> dict:
+    result = _call({"action": "getEcoStats", "line_user_id": line_user_id})
+    return result.get("data", {})
