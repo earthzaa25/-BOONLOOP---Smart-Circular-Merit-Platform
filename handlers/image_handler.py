@@ -47,7 +47,7 @@ def handle_image_message(event: MessageEvent, line_bot_api: MessagingApi,
         auto_match = is_slip and abs(slip_amount - expected) < 0.01
 
         # บันทึกข้อมูลการจ่าย
-        save_payment(
+        save_result = save_payment(
             line_user_id=user_id,
             booking_id=booking.get("booking_id", ""),
             amount=expected,
@@ -56,6 +56,16 @@ def handle_image_message(event: MessageEvent, line_bot_api: MessagingApi,
             slip_ref=slip.get("ref", ""),
             auto_match=auto_match,
         )
+
+        # ถ้าสลิปซ้ำ — แจ้งเตือนผู้ใช้และหยุด
+        if isinstance(save_result, dict) and save_result.get("duplicate"):
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=reply_token,
+                    messages=[TextMessage(text="⚠️ สลิปนี้ถูกใช้ไปแล้ว\nกรุณาส่งสลิปการโอนจริงของรายการนี้ 🙏")],
+                )
+            )
+            return
 
         # ตอบผู้ใช้
         if auto_match:

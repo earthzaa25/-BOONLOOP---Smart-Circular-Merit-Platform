@@ -9,6 +9,7 @@ from linebot.v3.webhooks import MessageEvent
 from config.constants import KEYWORDS, MERIT_PACKAGES
 from services.sheets_service import get_member, get_points_summary
 from handlers.booking_handler import start_booking
+from handlers.phase3_handler import show_my_bookings, show_returnable, show_eco
 from utils.flex_messages import (
     build_booking_menu_flex,
     build_points_flex,
@@ -46,13 +47,15 @@ def handle_text_message(event: MessageEvent, line_bot_api: MessagingApi):
         elif intent == "MENU_POINTS":
             _handle_points(user_id, reply_token, line_bot_api)
         elif intent == "MENU_ECO":
-            _handle_eco(user_id, reply_token, line_bot_api)
+            show_eco(user_id, reply_token, line_bot_api)
         elif intent == "MENU_PROJECT":
             _handle_project(reply_token, line_bot_api)
         elif intent == "MENU_RETURN":
-            _handle_return(reply_token, line_bot_api)
+            show_returnable(user_id, reply_token, line_bot_api)
         elif intent == "MENU_REWARD":
             _handle_reward(reply_token, line_bot_api)
+        elif intent == "MY_BOOKINGS":
+            show_my_bookings(user_id, reply_token, line_bot_api)
         elif intent == "GREETING":
             _handle_greeting(user_id, reply_token, line_bot_api)
         else:
