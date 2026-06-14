@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from linebot.v3.messaging import FlexMessage, FlexContainer
-from config.constants import MERIT_PACKAGES
 
 
 def _flex(alt_text, contents):
@@ -50,34 +49,35 @@ def _header(title, step_no, color):
     }
 
 
-# ─── Step 1: ประเภทชุด ─────────────────────────
-def build_package_type_flex():
+# วนสีปุ่มให้ดูมีชีวิตชีวา
+_PALETTE = ["#FF8F00", "#1565C0", "#6A1B9A", "#2E7D32", "#C62828", "#00838F"]
+
+
+# ─── Step 1: ประเภทชุด (จาก Sheet) ─────────────
+def build_package_type_flex(packages):
+    buttons = []
+    for i, cat in enumerate(packages):
+        label = f"{cat.get('emoji', '')} {cat.get('name', '')}".strip()
+        buttons.append(_pb(label, "type", cat["category"], _PALETTE[i % len(_PALETTE)]))
+    buttons.append(_cancel_button())
     contents = {
         "type": "bubble",
         "header": _header("เลือกประเภทชุดบุญ", 1, "#2E7D32"),
-        "body": {
-            "type": "box", "layout": "vertical", "spacing": "sm",
-            "contents": [
-                _pb("🕯️ ชุดบุญเข้าพรรษา", "type", "khao_phansa", "#FF8F00"),
-                _pb("🙏 ชุดไหว้ครูรักษ์โลก", "type", "wai_kru", "#1565C0"),
-                _cancel_button(),
-            ],
-        },
+        "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": buttons},
     }
     return _flex("เลือกประเภทชุดบุญ", contents)
 
 
-# ─── Step 2: เลือกชุด ──────────────────────────
-def build_package_items_flex(package_type):
-    pkg = MERIT_PACKAGES[package_type]
+# ─── Step 2: เลือกชุด (จาก Sheet, ใช้ index) ────
+def build_package_items_flex(cat):
     buttons = []
-    for key, item in pkg["items"].items():
+    for idx, item in enumerate(cat["items"]):
         label = f"{item['name']} - {item['price']} บาท"
-        buttons.append(_pb(label, "item", key, "#2E7D32"))
+        buttons.append(_pb(label, "item", str(idx), "#2E7D32"))
     buttons.append(_cancel_button())
     contents = {
         "type": "bubble",
-        "header": _header(f"{pkg['emoji']} {pkg['name']}", 2, "#2E7D32"),
+        "header": _header(f"{cat.get('emoji','')} {cat.get('name','')}".strip(), 2, "#2E7D32"),
         "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": buttons},
     }
     return _flex("เลือกชุดบุญ", contents)
@@ -128,19 +128,18 @@ def build_time_flex(time_slots):
     return _flex("เลือกเวลา", contents)
 
 
-# ─── Step 6: รูปแบบพิธี ────────────────────────
-def build_ceremony_flex():
+# ─── Step 6: รูปแบบพิธี (จาก Sheet) ────────────
+def build_ceremony_flex(ceremonies):
+    buttons = []
+    icons = ["🙏", "🤝", "📿", "🏮"]
+    colors = ["#C62828", "#AD1457", "#6A1B9A", "#00838F"]
+    for idx, c in enumerate(ceremonies):
+        buttons.append(_pb(f"{icons[idx % len(icons)]} {c}", "ceremony", str(idx), colors[idx % len(colors)]))
+    buttons.append(_cancel_button())
     contents = {
         "type": "bubble",
         "header": _header("เลือกรูปแบบการร่วมพิธี", 6, "#C62828"),
-        "body": {
-            "type": "box", "layout": "vertical", "spacing": "sm",
-            "contents": [
-                _pb("🙏 เข้าร่วมพิธีด้วยตนเอง", "ceremony", "self", "#C62828"),
-                _pb("🤝 มอบหมายให้ชุมชนดำเนินการ", "ceremony", "community", "#AD1457"),
-                _cancel_button(),
-            ],
-        },
+        "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": buttons},
     }
     return _flex("รูปแบบพิธี", contents)
 
