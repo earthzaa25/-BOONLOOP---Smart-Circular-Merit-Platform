@@ -3,14 +3,15 @@ import logging
 from flask import Flask, request, abort
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.messaging import Configuration, ApiClient, MessagingApi
+from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, MessagingApiBlob
 from linebot.v3.webhooks import (
-    MessageEvent, TextMessageContent, FollowEvent, PostbackEvent,
+    MessageEvent, TextMessageContent, ImageMessageContent, FollowEvent, PostbackEvent,
 )
 
 from handlers.message_handler import handle_text_message
 from handlers.follow_handler import handle_follow
 from handlers.postback_handler import handle_postback
+from handlers.image_handler import handle_image_message
 from services.rich_menu_service import setup_rich_menu
 
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +59,14 @@ def on_postback(event):
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         handle_postback(event, line_bot_api)
+
+
+@handler.add(MessageEvent, message=ImageMessageContent)
+def on_image(event):
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        blob_api = MessagingApiBlob(api_client)
+        handle_image_message(event, line_bot_api, blob_api)
 
 
 if __name__ == "__main__":
