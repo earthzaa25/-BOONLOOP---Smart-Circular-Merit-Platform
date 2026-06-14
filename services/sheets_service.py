@@ -89,3 +89,32 @@ def set_session(line_user_id: str, step: str, session_data: dict):
 
 def clear_session(line_user_id: str):
     _call({"action": "clearSession", "line_user_id": line_user_id})
+
+
+# ─── Payments (สลิป + ยืนยันการจ่าย) ───────────
+
+def save_payment(line_user_id: str, booking_id: str, amount: float,
+                 slip_amount: float, slip_datetime: str, slip_ref: str,
+                 auto_match: bool) -> str:
+    result = _call({
+        "action": "savePayment",
+        "line_user_id": line_user_id,
+        "booking_id": booking_id,
+        "amount": amount,
+        "slip_amount": slip_amount,
+        "slip_datetime": slip_datetime,
+        "slip_ref": slip_ref,
+        "auto_match": auto_match,
+    })
+    return result.get("payment_id")
+
+
+def get_booking(booking_id: str) -> dict | None:
+    result = _call({"action": "getBooking", "booking_id": booking_id})
+    return result.get("data")
+
+
+def get_latest_pending_booking(line_user_id: str) -> dict | None:
+    """ดึงการจองล่าสุดที่ยังรอชำระเงินของผู้ใช้"""
+    result = _call({"action": "getLatestPendingBooking", "line_user_id": line_user_id})
+    return result.get("data")
