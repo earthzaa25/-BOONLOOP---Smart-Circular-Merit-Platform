@@ -25,6 +25,16 @@ def handle_text_message(event: MessageEvent, line_bot_api: MessagingApi):
     text = event.message.text.strip()
     reply_token = event.reply_token
 
+    # คำสั่งพิเศษ: ดู LINE User ID ของตัวเอง (สำหรับตั้งค่า Admin)
+    if text.lower() in ("myid", "my id", "ไอดี"):
+        line_bot_api.reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[TextMessage(text=f"LINE User ID ของคุณ:\n{user_id}")],
+            )
+        )
+        return
+
     # หา intent จาก keyword
     intent = _detect_intent(text)
 

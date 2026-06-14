@@ -4,12 +4,15 @@ from linebot.v3.messaging import (
     MessagingApi,
     ReplyMessageRequest,
     TextMessage,
+    ImageMessage,
 )
 
 from config.constants import MERIT_PACKAGES
 from services.sheets_service import (
     get_member, set_session, get_session, clear_session, create_booking,
 )
+from services.content_service import get_packages, get_options, find_category
+from utils.promptpay import get_qr_url
 from utils.booking_flex import (
     build_package_type_flex,
     build_package_items_flex,
@@ -34,20 +37,9 @@ STEP_SELECT_CEREMONY = "select_ceremony"
 STEP_SELECT_PAYMENT = "select_payment"
 STEP_CONFIRM = "confirm"
 
-# สถานที่รับชุด (แก้ไขได้)
-LOCATIONS = [
-    "วัดหนองขาว",
-    "ศาลเจ้าชุมชน",
-    "โรงเรียนหนองขาวโกวิทพิทยาคม",
-    "ศูนย์ BoonLoop",
-]
-
-# ช่วงเวลารับ
-TIME_SLOTS = ["09:00-10:00", "10:00-11:00", "13:00-14:00", "15:00-16:00"]
-
 
 def start_booking(user_id, reply_token, line_bot_api):
-    """เริ่มการจอง — Step 1: เลือกประเภทชุด"""
+    """เริ่มการจอง — Step 1: เลือกประเภทชุด (ดึงจาก Google Sheet)"""
     member = get_member(user_id)
     if not member:
         line_bot_api.reply_message(
@@ -57,8 +49,19 @@ def start_booking(user_id, reply_token, line_bot_api):
             )
         )
         return
+
+    packages = get_packages()
+    if not packages:
+        line_bot_api.reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[TextMessage(text="ขณะนี้ยังไม่มีกิจกรรมเปิดให้จอง กรุณาติดตามข่าวสารเร็วๆ นี้ 🙏")],
+            )
+        )
+        return
+
     set_session(user_id, STEP_SELECT_TYPE, {})
-    flex = build_package_type_flex()
+    flex = build_package_type_flex(packages)
     line_bot_api.reply_message(
         ReplyMessageRequest(reply_token=reply_token, messages=[flex])
     )
@@ -113,22 +116,34 @@ def handle_booking_postback(user_id, data: dict, reply_token, line_bot_api):
 
 # ─── Step 2: เลือกชุดในประเภทนั้น ───────────────
 def _step_item(user_id, package_type, session_data, reply_token, line_bot_api):
-    if package_type not in MERIT_PACKAGES:
-        package_type = "khao_phansa"
+    packages = get_packages()
+    cat = find_category(packages, package_type)
+    if not cat:
+        # fallback ไปประเภทแรกที่มี
+        cat = packages[0] if packages else None
+        if not cat:
+            raise ValueError("no packages")
+        package_type = cat["category"]
     session_data["package_type"] = package_type
     set_session(user_id, STEP_SELECT_ITEM, session_data)
-    flex = build_package_items_flex(package_type)
+    flex = build_package_items_flex(cat)
     line_bot_api.reply_message(
         ReplyMessageRequest(reply_token=reply_token, messages=[flex])
     )
 
 
 # ─── Step 3: เลือกวันรับ ────────────────────────
-def _step_date(user_id, item_key, session_data, reply_token, line_bot_api):
-    pkg_type = session_data.get("package_type", "khao_phansa")
-    item = MERIT_PACKAGES[pkg_type]["items"].get(item_key)
-    if not item:
-        raise ValueError("invalid item")
+def _step_date(user_id, item_idx, session_data, reply_token, line_bot_api):
+    pkg_type = session_data.get("package_type")
+    packages = get_packages()
+    cat = find_category(packages, pkg_type)
+    if not cat:
+        raise ValueError("invalid category")
+    idx = int(item_idx)
+    items = cat["items"]
+    if idx < 0 or idx >= len(items):
+        raise ValueError("invalid item index")
+    item = items[idx]
     session_data["package_name"] = item["name"]
     session_data["price"] = item["price"]
     session_data["eco_score"] = item["eco_score"]
@@ -143,7 +158,8 @@ def _step_date(user_id, item_key, session_data, reply_token, line_bot_api):
 def _step_location(user_id, date_value, session_data, reply_token, line_bot_api):
     session_data["pickup_date"] = date_value
     set_session(user_id, STEP_SELECT_LOCATION, session_data)
-    flex = build_location_flex(LOCATIONS)
+    locations = get_options().get("location", [])
+    flex = build_location_flex(locations)
     line_bot_api.reply_message(
         ReplyMessageRequest(reply_token=reply_token, messages=[flex])
     )
@@ -152,9 +168,11 @@ def _step_location(user_id, date_value, session_data, reply_token, line_bot_api)
 # ─── Step 5: เลือกเวลา ──────────────────────────
 def _step_time(user_id, location_idx, session_data, reply_token, line_bot_api):
     idx = int(location_idx)
-    session_data["location"] = LOCATIONS[idx]
+    locations = get_options().get("location", [])
+    session_data["location"] = locations[idx] if idx < len(locations) else ""
     set_session(user_id, STEP_SELECT_TIME, session_data)
-    flex = build_time_flex(TIME_SLOTS)
+    time_slots = get_options().get("time", [])
+    flex = build_time_flex(time_slots)
     line_bot_api.reply_message(
         ReplyMessageRequest(reply_token=reply_token, messages=[flex])
     )
@@ -163,18 +181,21 @@ def _step_time(user_id, location_idx, session_data, reply_token, line_bot_api):
 # ─── Step 6: เลือกรูปแบบพิธี ─────────────────────
 def _step_ceremony(user_id, time_idx, session_data, reply_token, line_bot_api):
     idx = int(time_idx)
-    session_data["pickup_time"] = TIME_SLOTS[idx]
+    time_slots = get_options().get("time", [])
+    session_data["pickup_time"] = time_slots[idx] if idx < len(time_slots) else ""
     set_session(user_id, STEP_SELECT_CEREMONY, session_data)
-    flex = build_ceremony_flex()
+    ceremonies = get_options().get("ceremony", [])
+    flex = build_ceremony_flex(ceremonies)
     line_bot_api.reply_message(
         ReplyMessageRequest(reply_token=reply_token, messages=[flex])
     )
 
 
 # ─── Step 7: เลือกการชำระเงิน ────────────────────
-def _step_payment(user_id, ceremony, session_data, reply_token, line_bot_api):
-    ceremony_map = {"self": "เข้าร่วมพิธีด้วยตนเอง", "community": "มอบหมายให้ชุมชนดำเนินการ"}
-    session_data["ceremony_type"] = ceremony_map.get(ceremony, ceremony)
+def _step_payment(user_id, ceremony_idx, session_data, reply_token, line_bot_api):
+    idx = int(ceremony_idx)
+    ceremonies = get_options().get("ceremony", [])
+    session_data["ceremony_type"] = ceremonies[idx] if idx < len(ceremonies) else ""
     set_session(user_id, STEP_SELECT_PAYMENT, session_data)
     flex = build_payment_flex()
     line_bot_api.reply_message(
@@ -215,7 +236,27 @@ def _finalize_booking(user_id, value, session_data, reply_token, line_bot_api):
         eco_score=session_data.get("eco_score", 10),
     )
     clear_session(user_id)
-    flex = build_booking_success_flex(booking_id, session_data)
+
+    price = session_data.get("price", 0)
+    payment_method = session_data.get("payment_method", "")
+    messages = [build_booking_success_flex(booking_id, session_data)]
+
+    # ถ้าเลือก QR/PromptPay → ส่ง QR code + วิธีจ่าย
+    if "เงินสด" not in payment_method:
+        qr_url = get_qr_url(price)
+        messages.append(ImageMessage(original_content_url=qr_url, preview_image_url=qr_url))
+        messages.append(TextMessage(
+            text=(
+                f"💸 สแกน QR เพื่อชำระ {price} บาท\n\n"
+                f"หลังโอนแล้ว กรุณา *ส่งรูปสลิป* กลับมาในแชทนี้\n"
+                f"ระบบจะตรวจสอบอัตโนมัติ 🙏"
+            )
+        ))
+    else:
+        messages.append(TextMessage(
+            text=f"💵 ชำระเงินสด {price} บาท ตอนรับชุดที่ {session_data.get('location', '')} 🙏"
+        ))
+
     line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
+        ReplyMessageRequest(reply_token=reply_token, messages=messages)
     )
