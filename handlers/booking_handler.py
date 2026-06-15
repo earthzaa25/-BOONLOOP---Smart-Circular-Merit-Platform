@@ -12,7 +12,7 @@ from services.sheets_service import (
     get_member, set_session, get_session, clear_session, create_booking,
 )
 from services.content_service import get_packages, get_options, find_category
-from utils.promptpay import get_qr_url
+from utils.promptpay import get_qr_url, is_static_qr, get_static_qr_url
 from utils.booking_flex import (
     build_package_type_flex,
     build_package_items_flex,
@@ -243,15 +243,30 @@ def _finalize_booking(user_id, value, session_data, reply_token, line_bot_api):
 
     # ถ้าเลือก QR/PromptPay → ส่ง QR code + วิธีจ่าย
     if "เงินสด" not in payment_method:
-        qr_url = get_qr_url(price)
-        messages.append(ImageMessage(original_content_url=qr_url, preview_image_url=qr_url))
-        messages.append(TextMessage(
-            text=(
-                f"💸 สแกน QR เพื่อชำระ {price} บาท\n\n"
-                f"หลังโอนแล้ว กรุณา *ส่งรูปสลิป* กลับมาในแชทนี้\n"
-                f"ระบบจะตรวจสอบอัตโนมัติ 🙏"
-            )
-        ))
+        if is_static_qr():
+            # ใช้รูป QR static — ลูกค้าต้องกรอกยอดเอง
+            qr_url = get_static_qr_url()
+            messages.append(ImageMessage(original_content_url=qr_url, preview_image_url=qr_url))
+            messages.append(TextMessage(
+                text=(
+                    f"💸 สแกน QR ด้านบนเพื่อชำระเงิน\n\n"
+                    f"⚠️ กรุณากรอกยอด *{price} บาท* ด้วยตนเอง\n"
+                    f"(QR นี้ไม่ได้ระบุยอดอัตโนมัติ)\n\n"
+                    f"หลังโอนแล้ว กรุณา *ส่งรูปสลิป* กลับมาในแชทนี้\n"
+                    f"ระบบจะตรวจสอบให้ 🙏"
+                )
+            ))
+        else:
+            # สร้าง QR แบบมียอดอัตโนมัติ
+            qr_url = get_qr_url(price)
+            messages.append(ImageMessage(original_content_url=qr_url, preview_image_url=qr_url))
+            messages.append(TextMessage(
+                text=(
+                    f"💸 สแกน QR เพื่อชำระ {price} บาท\n\n"
+                    f"หลังโอนแล้ว กรุณา *ส่งรูปสลิป* กลับมาในแชทนี้\n"
+                    f"ระบบจะตรวจสอบอัตโนมัติ 🙏"
+                )
+            ))
     else:
         messages.append(TextMessage(
             text=f"💵 ชำระเงินสด {price} บาท ตอนรับชุดที่ {session_data.get('location', '')} 🙏"
