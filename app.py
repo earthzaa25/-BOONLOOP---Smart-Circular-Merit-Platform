@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask, request, abort
+from flask import Flask, request, abort, send_file
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, MessagingApiBlob
@@ -38,6 +38,15 @@ def webhook():
 @app.route("/health", methods=["GET"])
 def health():
     return {"status": "ok", "project": "BoonLoop"}
+
+
+@app.route("/qr", methods=["GET"])
+def qr_image():
+    """เสิร์ฟรูป QR PromptPay ด้วย content-type ที่ถูกต้อง (LINE ต้องการ)"""
+    qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "promptpay-qr.jpg")
+    if not os.path.exists(qr_path):
+        abort(404)
+    return send_file(qr_path, mimetype="image/jpeg")
 
 
 @handler.add(FollowEvent)
