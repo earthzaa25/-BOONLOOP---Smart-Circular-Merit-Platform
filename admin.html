@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoonLoop · ยืนยันการชำระเงิน</title>
+<style>
+  :root {
+    --leaf: #2E7D32;
+    --leaf-deep: #1B5E20;
+    --leaf-soft: #E8F5E9;
+    --gold: #C8862C;
+    --ink: #1A2B1D;
+    --muted: #6B7B6E;
+    --line: #DCE6DD;
+    --paper: #FAF8F3;
+    --warn-bg: #FFF4E0;
+    --warn-fg: #B26A00;
+    --ok-bg: #E4F3E5;
+    --ok-fg: #2E7D32;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.5;
+    padding: 0 0 60px;
+  }
+  header {
+    background: linear-gradient(135deg, var(--leaf-deep), var(--leaf));
+    color: #fff;
+    padding: 28px 20px 24px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; }
+  .brand span { font-size: .8rem; opacity: .85; }
+  .subtitle { margin-top: 6px; font-size: .9rem; opacity: .9; }
+
+  .toolbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 22px auto 8px; max-width: 760px; padding: 0 16px;
+  }
+  .count { font-size: .95rem; color: var(--muted); }
+  .count b { color: var(--leaf); font-size: 1.1rem; }
+  button.refresh {
+    border: 1px solid var(--line); background: #fff; color: var(--leaf);
+    padding: 8px 16px; border-radius: 999px; font-size: .85rem; font-weight: 600;
+    cursor: pointer; transition: .15s;
+  }
+  button.refresh:hover { background: var(--leaf-soft); }
+
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; margin: 14px 0; box-shadow: 0 1px 3px rgba(0,0,0,.03);
+  }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .pid { font-size: .75rem; color: var(--muted); font-family: ui-monospace, monospace; }
+  .badge { font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .badge.auto { background: var(--ok-bg); color: var(--ok-fg); }
+  .badge.review { background: var(--warn-bg); color: var(--warn-fg); }
+
+  .rows { margin: 14px 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; }
+  .rows dt { color: var(--muted); font-size: .85rem; }
+  .rows dd { font-size: .9rem; font-weight: 600; text-align: right; }
+  .amount-match { color: var(--leaf); }
+  .amount-diff { color: var(--warn-fg); }
+
+  .actions { display: flex; gap: 10px; margin-top: 8px; }
+  button.verify {
+    flex: 1; border: none; background: var(--leaf); color: #fff;
+    padding: 12px; border-radius: 10px; font-size: .95rem; font-weight: 700;
+    cursor: pointer; transition: .15s;
+  }
+  button.verify:hover { background: var(--leaf-deep); }
+  button.verify:disabled { background: var(--muted); cursor: default; }
+
+  .empty, .loading {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+  }
+  .empty .leaf { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+
+  .setup {
+    max-width: 760px; margin: 30px auto 0; padding: 16px;
+    background: var(--leaf-soft); border-radius: 12px; font-size: .85rem; color: var(--leaf-deep);
+  }
+  .setup code {
+    background: #fff; padding: 2px 6px; border-radius: 4px;
+    font-family: ui-monospace, monospace; font-size: .8rem; word-break: break-all;
+  }
+  .setup input {
+    width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: .8rem; font-family: ui-monospace, monospace;
+  }
+
+  /* Tabs */
+  nav.tabs { background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; }
+  .tabwrap { display: flex; gap: 4px; }
+  .tab {
+    border: none; background: none; padding: 14px 16px; font-size: .9rem; font-weight: 600;
+    color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; font-family: inherit;
+  }
+  .tab.active { color: var(--leaf); border-bottom-color: var(--leaf); }
+
+  .hint { font-size: .82rem; color: var(--muted); margin-top: 4px; padding: 0 16px; }
+
+  /* Management rows */
+  .mrow {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin: 10px 0; display: flex; align-items: center; gap: 12px;
+  }
+  .mrow.off { opacity: .5; }
+  .mrow .info { flex: 1; min-width: 0; }
+  .mrow .info .name { font-weight: 700; font-size: .95rem; }
+  .mrow .info .meta { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+  .group-label {
+    font-size: .8rem; font-weight: 700; color: var(--gold); text-transform: uppercase;
+    letter-spacing: .5px; margin: 20px 0 4px; padding: 0 16px;
+  }
+  .icon-btn {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 10px;
+    cursor: pointer; font-size: .8rem; color: var(--muted);
+  }
+  .icon-btn:hover { background: var(--leaf-soft); color: var(--leaf); }
+  .icon-btn.del:hover { background: #FDECEA; color: #C62828; }
+
+  /* Toggle switch */
+  .switch { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+  .switch input { display: none; }
+  .slider {
+    position: absolute; inset: 0; background: #ccc; border-radius: 26px; cursor: pointer; transition: .2s;
+  }
+  .slider::before {
+    content: ""; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .2s;
+  }
+  .switch input:checked + .slider { background: var(--leaf); }
+  .switch input:checked + .slider::before { transform: translateX(20px); }
+
+  /* Modal */
+  .modal-bg {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 16px; padding: 24px; width: 100%; max-width: 420px;
+  }
+  .modal h3 { margin-bottom: 16px; color: var(--leaf-deep); }
+  .modal label { display: block; font-size: .82rem; color: var(--muted); margin: 10px 0 4px; }
+  .modal input, .modal select {
+    width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: .9rem; font-family: inherit;
+  }
+  .modal .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal button {
+    flex: 1; padding: 11px; border-radius: 9px; font-size: .9rem; font-weight: 700;
+    cursor: pointer; border: none; font-family: inherit;
+  }
+  .modal .save { background: var(--leaf); color: #fff; }
+  .modal .cancel { background: #eee; color: var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand"><h1>🌿 BoonLoop</h1><span>Admin</span></div>
+    <div class="subtitle">จัดการการชำระเงิน ชุดบุญ และตัวเลือกการจอง</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="wrap tabwrap">
+    <button class="tab active" data-tab="payments" onclick="switchTab('payments')">💸 ชำระเงิน</button>
+    <button class="tab" data-tab="packages" onclick="switchTab('packages')">🕯️ ชุดบุญ</button>
+    <button class="tab" data-tab="options" onclick="switchTab('options')">📍 ตัวเลือก</button>
+    <button class="tab" data-tab="members" onclick="switchTab('members')">👥 สมาชิก</button>
+  </div>
+</nav>
+
+<!-- ════ PAYMENTS TAB ════ -->
+<section id="tab-payments" class="tabpane">
+  <div class="toolbar">
+    <div class="count" id="count">กำลังโหลด…</div>
+    <button class="refresh" onclick="load()">↻ รีเฟรช</button>
+  </div>
+  <div class="wrap" id="list">
+    <div class="loading">กำลังโหลดรายการ…</div>
+  </div>
+</section>
+
+<!-- ════ PACKAGES TAB ════ -->
+<section id="tab-packages" class="tabpane" style="display:none">
+  <div class="toolbar">
+    <div class="count">ชุดบุญ &amp; ประเภทกิจกรรม</div>
+    <button class="refresh" onclick="addPackage()">+ เพิ่มชุด</button>
+  </div>
+  <div class="wrap" id="pkgList"><div class="loading">กำลังโหลด…</div></div>
+  <div class="wrap hint">💡 ปิด toggle เพื่อซ่อนชุดที่หมดเทศกาล — Bot จะแสดงเฉพาะที่เปิดอยู่</div>
+</section>
+
+<!-- ════ OPTIONS TAB ════ -->
+<section id="tab-options" class="tabpane" style="display:none">
+  <div class="toolbar">
+    <div class="count">สถานที่ / เวลา / รูปแบบพิธี</div>
+    <button class="refresh" onclick="addOption()">+ เพิ่มตัวเลือก</button>
+  </div>
+  <div class="wrap" id="optList"><div class="loading">กำลังโหลด…</div></div>
+</section>
+
+<!-- ════ MEMBERS TAB ════ -->
+<section id="tab-members" class="tabpane" style="display:none">
+  <div class="toolbar">
+    <div class="count" id="memCount">สมาชิก</div>
+    <div style="display:flex;gap:8px">
+      <button class="refresh" onclick="exportCSV('members')">⬇ สมาชิก CSV</button>
+      <button class="refresh" onclick="exportCSV('bookings')">⬇ การจอง CSV</button>
+    </div>
+  </div>
+  <div class="wrap" id="memList"><div class="loading">กำลังโหลด…</div></div>
+</section>
+
+<div class="setup wrap" id="setup" style="display:none">
+  <b>ตั้งค่าครั้งแรก:</b> วาง Web App URL ของ Apps Script ด้านล่าง (ระบบจะจำไว้ในเบราว์เซอร์นี้)
+  <input id="urlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" />
+</div>
+
+<!-- Modal สำหรับเพิ่ม/แก้ไข -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<script>
+  const LS_KEY = "boonloop_webapp_url";
+  const LS_PASS = "boonloop_passcode";
+
+  function getUrl() {
+    return localStorage.getItem(LS_KEY) || "";
+  }
+  function getPass() {
+    return localStorage.getItem(LS_PASS) || "";
+  }
+
+  function fmtAmount(n) {
+    return Number(n).toLocaleString("th-TH", { minimumFractionDigits: 2 });
+  }
+
+  async function load() {
+    const url = getUrl();
+    const setup = document.getElementById("setup");
+    if (!url) {
+      setup.style.display = "block";
+      document.getElementById("list").innerHTML =
+        '<div class="empty">กรุณาตั้งค่า Web App URL ด้านล่างก่อน</div>';
+      document.getElementById("count").textContent = "";
+      return;
+    }
+    setup.style.display = "none";
+    document.getElementById("list").innerHTML = '<div class="loading">กำลังโหลดรายการ…</div>';
+
+    try {
+      const json = await api("getPendingPayments");
+      if (json && json.error === "unauthorized") {
+        promptPasscode();
+        return;
+      }
+      const items = (json.data || []);
+      render(items);
+    } catch (e) {
+      document.getElementById("list").innerHTML =
+        '<div class="empty">โหลดข้อมูลไม่สำเร็จ<br><small>' + e.message + '</small></div>';
+    }
+  }
+
+  function render(items) {
+    const list = document.getElementById("list");
+    document.getElementById("count").innerHTML =
+      "รอยืนยัน <b>" + items.length + "</b> รายการ";
+
+    if (!items.length) {
+      list.innerHTML = '<div class="empty"><span class="leaf">🍃</span>ไม่มีรายการรอยืนยัน</div>';
+      return;
+    }
+
+    list.innerHTML = items.map(function(p) {
+      const isAuto = p.status === "auto_matched";
+      const match = Number(p.slip_amount) === Number(p.amount);
+      return `
+      <div class="card" id="card-${p.payment_id}">
+        <div class="card-top">
+          <div>
+            <div style="font-weight:800;font-size:1.05rem;color:var(--leaf-deep)">👤 ${p.display_name || 'ไม่ทราบชื่อ'}</div>
+            <div class="pid" style="margin-top:2px">${p.payment_id}</div>
+            <div style="font-weight:700;margin-top:2px">${p.booking_id}</div>
+          </div>
+          <span class="badge ${isAuto ? 'auto' : 'review'}">
+            ${isAuto ? '✓ ยอดตรงอัตโนมัติ' : '⚠ ต้องตรวจสอบ'}
+          </span>
+        </div>
+        <dl class="rows">
+          <dt>ผู้จ่าย</dt><dd>${p.display_name || '—'}</dd>
+          <dt>ยอดที่ต้องจ่าย</dt><dd>${fmtAmount(p.amount)} บาท</dd>
+          <dt>ยอดในสลิป</dt>
+          <dd class="${match ? 'amount-match' : 'amount-diff'}">${fmtAmount(p.slip_amount)} บาท</dd>
+          <dt>เวลาในสลิป</dt><dd>${p.slip_datetime || '—'}</dd>
+          <dt>เลขอ้างอิง</dt><dd style="font-family:ui-monospace,monospace;font-size:.8rem">${p.slip_ref || '—'}</dd>
+          <dt>รับสลิปเมื่อ</dt><dd style="font-weight:500;color:var(--muted)">${p.created_at}</dd>
+        </dl>
+        <div class="actions">
+          <button class="verify" onclick="verify('${p.payment_id}','${p.booking_id}',this)">
+            ✓ ยืนยันการชำระเงิน
+          </button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  async function verify(paymentId, bookingId, btn) {
+    if (!confirm("ยืนยันว่าได้รับเงินสำหรับ " + bookingId + " แล้ว?")) return;
+    btn.disabled = true;
+    btn.textContent = "กำลังยืนยัน…";
+    try {
+      const json = await api("verifyPayment", { payment_id: paymentId, booking_id: bookingId });
+      if (json.success) {
+        const card = document.getElementById("card-" + paymentId);
+        card.style.transition = ".3s";
+        card.style.opacity = "0";
+        setTimeout(load, 350);
+      } else {
+        alert("ยืนยันไม่สำเร็จ: " + (json.error || "ไม่ทราบสาเหตุ"));
+        btn.disabled = false;
+        btn.textContent = "✓ ยืนยันการชำระเงิน";
+      }
+    } catch (e) {
+      alert("เกิดข้อผิดพลาด: " + e.message);
+      btn.disabled = false;
+      btn.textContent = "✓ ยืนยันการชำระเงิน";
+    }
+  }
+
+  document.getElementById("urlInput").addEventListener("change", function(e) {
+    localStorage.setItem(LS_KEY, e.target.value.trim());
+    load();
+  });
+
+  // ════ TAB SWITCHING ════
+  function switchTab(name) {
+    document.querySelectorAll(".tab").forEach(function(t) {
+      t.classList.toggle("active", t.dataset.tab === name);
+    });
+    document.querySelectorAll(".tabpane").forEach(function(p) {
+      p.style.display = p.id === "tab-" + name ? "" : "none";
+    });
+    if (name === "packages") loadPackages();
+    if (name === "options") loadOptions();
+    if (name === "members") loadMembers();
+  }
+
+  async function api(action, params) {
+    const url = getUrl();
+    let q = url + "?action=" + action + "&passcode=" + encodeURIComponent(getPass());
+    for (const k in (params || {})) q += "&" + k + "=" + encodeURIComponent(params[k]);
+    const res = await fetch(q);
+    return res.json();
+  }
+
+  // ════ PACKAGES ════
+  async function loadPackages() {
+    const box = document.getElementById("pkgList");
+    box.innerHTML = '<div class="loading">กำลังโหลด…</div>';
+    try {
+      const json = await api("getAllPackages");
+      const rows = json.data || [];
+      if (!rows.length) { box.innerHTML = '<div class="empty">ยังไม่มีชุดบุญ</div>'; return; }
+      // group by category
+      const groups = {};
+      rows.forEach(function(r) {
+        const key = r.category_name || r.category;
+        (groups[key] = groups[key] || []).push(r);
+      });
+      let html = "";
+      for (const g in groups) {
+        html += '<div class="group-label">' + g + '</div>';
+        html += groups[g].map(pkgRow).join("");
+      }
+      box.innerHTML = html;
+    } catch (e) {
+      box.innerHTML = '<div class="empty">โหลดไม่สำเร็จ: ' + e.message + '</div>';
+    }
+  }
+
+  function pkgRow(r) {
+    return `
+    <div class="mrow ${r.active ? '' : 'off'}">
+      <label class="switch">
+        <input type="checkbox" ${r.active ? 'checked' : ''}
+          onchange="togglePkg(${r.row}, this.checked)">
+        <span class="slider"></span>
+      </label>
+      <div class="info">
+        <div class="name">${r.item_name}</div>
+        <div class="meta">${r.price} บาท · Eco ${r.eco_score}</div>
+      </div>
+      <button class="icon-btn" onclick='editPackage(${JSON.stringify(r)})'>แก้</button>
+      <button class="icon-btn del" onclick="delPkg(${r.row})">ลบ</button>
+    </div>`;
+  }
+
+  async function togglePkg(row, active) {
+    await api("togglePackage", { row: row, active: active });
+  }
+  async function delPkg(row) {
+    if (!confirm("ลบชุดบุญนี้?")) return;
+    await api("deletePackage", { row: row });
+    loadPackages();
+  }
+
+  function addPackage() {
+    editPackage({ row: "", category: "", category_name: "", category_emoji: "🕯️",
+      item_name: "", price: "", eco_score: "", active: true });
+  }
+
+  function editPackage(r) {
+    document.getElementById("modalBox").innerHTML = `
+      <h3>${r.row ? 'แก้ไขชุดบุญ' : 'เพิ่มชุดบุญ'}</h3>
+      <label>รหัสประเภท (เช่น khao_phansa)</label>
+      <input id="m_cat" value="${r.category || ''}">
+      <label>ชื่อประเภท (เช่น ชุดบุญเข้าพรรษา)</label>
+      <input id="m_catname" value="${r.category_name || ''}">
+      <label>ไอคอน Emoji</label>
+      <input id="m_emoji" value="${r.category_emoji || ''}">
+      <label>ชื่อชุด</label>
+      <input id="m_name" value="${r.item_name || ''}">
+      <label>ราคา (บาท)</label>
+      <input id="m_price" type="number" value="${r.price || ''}">
+      <label>Eco Score</label>
+      <input id="m_eco" type="number" value="${r.eco_score || ''}">
+      <div class="modal-actions">
+        <button class="cancel" onclick="closeModal()">ยกเลิก</button>
+        <button class="save" onclick="savePkg('${r.row}')">บันทึก</button>
+      </div>`;
+    document.getElementById("modalBg").classList.add("show");
+  }
+
+  async function savePkg(row) {
+    const p = {
+      row: row,
+      category: val("m_cat"), category_name: val("m_catname"),
+      category_emoji: val("m_emoji"), item_name: val("m_name"),
+      price: val("m_price"), eco_score: val("m_eco"), active: true
+    };
+    if (!p.category || !p.item_name || !p.price) { alert("กรุณากรอกรหัสประเภท ชื่อชุด และราคา"); return; }
+    await api("savePackage", p);
+    closeModal(); loadPackages();
+  }
+
+  // ════ OPTIONS ════
+  const TYPE_LABEL = { location: "📍 สถานที่รับ", time: "🕐 ช่วงเวลา", ceremony: "🙏 รูปแบบพิธี" };
+
+  async function loadOptions() {
+    const box = document.getElementById("optList");
+    box.innerHTML = '<div class="loading">กำลังโหลด…</div>';
+    try {
+      const json = await api("getAllOptions");
+      const rows = json.data || [];
+      if (!rows.length) { box.innerHTML = '<div class="empty">ยังไม่มีตัวเลือก</div>'; return; }
+      const groups = { location: [], time: [], ceremony: [] };
+      rows.forEach(function(r) { (groups[r.type] = groups[r.type] || []).push(r); });
+      let html = "";
+      ["location", "time", "ceremony"].forEach(function(type) {
+        if (!groups[type] || !groups[type].length) return;
+        html += '<div class="group-label">' + (TYPE_LABEL[type] || type) + '</div>';
+        html += groups[type].map(optRow).join("");
+      });
+      box.innerHTML = html;
+    } catch (e) {
+      box.innerHTML = '<div class="empty">โหลดไม่สำเร็จ: ' + e.message + '</div>';
+    }
+  }
+
+  function optRow(r) {
+    return `
+    <div class="mrow ${r.active ? '' : 'off'}">
+      <label class="switch">
+        <input type="checkbox" ${r.active ? 'checked' : ''}
+          onchange="toggleOpt(${r.row}, this.checked)">
+        <span class="slider"></span>
+      </label>
+      <div class="info"><div class="name">${r.value}</div></div>
+      <button class="icon-btn del" onclick="delOpt(${r.row})">ลบ</button>
+    </div>`;
+  }
+
+  async function toggleOpt(row, active) {
+    await api("toggleOption", { row: row, active: active });
+  }
+  async function delOpt(row) {
+    if (!confirm("ลบตัวเลือกนี้?")) return;
+    await api("deleteOption", { row: row });
+    loadOptions();
+  }
+
+  function addOption() {
+    document.getElementById("modalBox").innerHTML = `
+      <h3>เพิ่มตัวเลือก</h3>
+      <label>ประเภท</label>
+      <select id="o_type">
+        <option value="location">📍 สถานที่รับ</option>
+        <option value="time">🕐 ช่วงเวลา</option>
+        <option value="ceremony">🙏 รูปแบบพิธี</option>
+      </select>
+      <label>ค่า (เช่น วัดหนองขาว / 09:00-10:00)</label>
+      <input id="o_value">
+      <div class="modal-actions">
+        <button class="cancel" onclick="closeModal()">ยกเลิก</button>
+        <button class="save" onclick="saveOpt()">บันทึก</button>
+      </div>`;
+    document.getElementById("modalBg").classList.add("show");
+  }
+
+  async function saveOpt() {
+    const type = val("o_type"), value = val("o_value");
+    if (!value) { alert("กรุณากรอกค่า"); return; }
+    await api("saveOption", { type: type, value: value, active: true });
+    closeModal(); loadOptions();
+  }
+
+  // helpers
+  function val(id) { return document.getElementById(id).value.trim(); }
+  function closeModal() { document.getElementById("modalBg").classList.remove("show"); }
+  document.getElementById("modalBg").addEventListener("click", function(e) {
+    if (e.target.id === "modalBg") closeModal();
+  });
+
+  // ════ MEMBERS ════
+  async function loadMembers() {
+    const box = document.getElementById("memList");
+    box.innerHTML = '<div class="loading">กำลังโหลด…</div>';
+    try {
+      const json = await api("getAllMembers");
+      if (json && json.error === "unauthorized") { promptPasscode(); return; }
+      const rows = json.data || [];
+      document.getElementById("memCount").innerHTML = "สมาชิก <b>" + rows.length + "</b> คน";
+      if (!rows.length) { box.innerHTML = '<div class="empty">ยังไม่มีสมาชิก</div>'; return; }
+      // เรียงตามคะแนนบุญมากสุด
+      rows.sort(function(a, b) { return (b.boon_points || 0) - (a.boon_points || 0); });
+      box.innerHTML = rows.map(function(m, i) {
+        return `
+        <div class="mrow">
+          <div style="font-weight:800;color:var(--gold);width:28px;text-align:center">${i + 1}</div>
+          <div class="info">
+            <div class="name">${m.display_name || '-'}</div>
+            <div class="meta">🏆 ${m.boon_points || 0} คะแนน · ♻️ Eco ${m.eco_score || 0} · จอง ${m.total_bookings || 0} ครั้ง</div>
+          </div>
+        </div>`;
+      }).join("");
+    } catch (e) {
+      box.innerHTML = '<div class="empty">โหลดไม่สำเร็จ: ' + e.message + '</div>';
+    }
+  }
+
+  // ════ EXPORT CSV ════
+  async function exportCSV(kind) {
+    try {
+      const action = kind === "members" ? "getAllMembers" : "getAllBookings";
+      const json = await api(action);
+      if (json && json.error === "unauthorized") { promptPasscode(); return; }
+      const rows = json.data || [];
+      if (!rows.length) { alert("ไม่มีข้อมูลให้ export"); return; }
+      const headers = Object.keys(rows[0]);
+      let csv = "\uFEFF" + headers.join(",") + "\n";  // BOM กัน Excel เพี้ยนภาษาไทย
+      rows.forEach(function(r) {
+        csv += headers.map(function(h) {
+          let v = (r[h] === null || r[h] === undefined) ? "" : String(r[h]);
+          if (v.indexOf(",") !== -1 || v.indexOf('"') !== -1) v = '"' + v.replace(/"/g, '""') + '"';
+          return v;
+        }).join(",") + "\n";
+      });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "boonloop_" + kind + "_" + new Date().toISOString().slice(0, 10) + ".csv";
+      a.click();
+    } catch (e) {
+      alert("Export ไม่สำเร็จ: " + e.message);
+    }
+  }
+
+  // ════ PASSCODE ════
+  function promptPasscode() {
+    const p = prompt("กรุณาใส่รหัสผ่าน Admin:");
+    if (p !== null) {
+      localStorage.setItem(LS_PASS, p);
+      load();
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

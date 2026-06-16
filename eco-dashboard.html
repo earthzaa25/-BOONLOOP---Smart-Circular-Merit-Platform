@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoonLoop · Eco Impact</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --leaf: #2E7D32; --leaf-deep: #1B5E20; --leaf-soft: #E8F5E9;
+    --gold: #C8862C; --ink: #1A2B1D; --muted: #6B7B6E;
+    --line: #DCE6DD; --paper: #F4F7F2; --sky: #1565C0; --sun: #F57F17;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    background: var(--paper); color: var(--ink); padding-bottom: 50px;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--leaf-deep), var(--leaf) 70%, #43A047);
+    color: #fff; padding: 36px 20px 60px; text-align: center; position: relative; overflow: hidden;
+  }
+  .hero::after {
+    content: "🌍"; position: absolute; font-size: 200px; opacity: .06;
+    right: -30px; bottom: -50px;
+  }
+  .hero h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -.5px; }
+  .hero .tag { font-size: .9rem; opacity: .9; margin-top: 6px; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 16px; }
+
+  .hero-num { margin: 24px auto 0; }
+  .hero-num .big { font-size: 3.2rem; font-weight: 800; line-height: 1; }
+  .hero-num .big small { font-size: 1.1rem; font-weight: 600; }
+  .hero-num .lbl { font-size: .9rem; opacity: .9; margin-top: 4px; }
+
+  .cards {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    margin-top: -36px; position: relative; z-index: 2;
+  }
+  .card {
+    background: #fff; border-radius: 14px; padding: 16px 8px; text-align: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,.06);
+  }
+  .card .v { font-size: 1.5rem; font-weight: 800; }
+  .card .u { font-size: .68rem; color: var(--muted); }
+  .card .l { font-size: .72rem; color: #555; margin-top: 4px; }
+  .c-leaf .v { color: var(--leaf); }
+  .c-sky .v { color: var(--sky); }
+  .c-sun .v { color: var(--sun); }
+
+  .panel {
+    background: #fff; border-radius: 16px; padding: 20px; margin-top: 18px;
+    border: 1px solid var(--line);
+  }
+  .panel h2 { font-size: 1rem; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .equiv { display: flex; gap: 12px; margin-top: 14px; }
+  .equiv .e {
+    flex: 1; background: var(--leaf-soft); border-radius: 12px; padding: 14px; text-align: center;
+  }
+  .equiv .e .icon { font-size: 1.6rem; }
+  .equiv .e .t { font-size: .8rem; color: var(--leaf-deep); margin-top: 4px; font-weight: 600; }
+
+  .loading, .err { text-align: center; padding: 50px 20px; color: var(--muted); }
+  .setup {
+    margin: 20px auto 0; padding: 16px; background: var(--leaf-soft);
+    border-radius: 12px; font-size: .85rem; color: var(--leaf-deep);
+  }
+  .setup input {
+    width: 100%; margin-top: 8px; padding: 10px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: .8rem; font-family: ui-monospace, monospace;
+  }
+  canvas { max-height: 260px; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>♻️ Eco Impact</h1>
+  <div class="tag">ผลกระทบเชิงบวกของชุมชน BoonLoop</div>
+  <div class="hero-num">
+    <div class="big" id="heroWaste">—<small> กก.</small></div>
+    <div class="lbl">ขยะที่ลดได้ทั้งหมด</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="cards">
+    <div class="card c-leaf"><div class="v" id="cWaste">—</div><div class="u">กก.</div><div class="l">ขยะที่ลด</div></div>
+    <div class="card c-sky"><div class="v" id="cCo2">—</div><div class="u">กก.CO₂</div><div class="l">ลดคาร์บอน</div></div>
+    <div class="card c-sun"><div class="v" id="cPoints">—</div><div class="u">คะแนน</div><div class="l">บุญสะสม</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>🌍 เทียบเท่ากับ</h2>
+    <div class="equiv">
+      <div class="e"><div class="icon">🍶</div><div class="t" id="eqBottle">— ขวด</div><div style="font-size:.7rem;color:#888">ขวดพลาสติก</div></div>
+      <div class="e"><div class="icon">🌳</div><div class="t" id="eqTree">— ต้น</div><div style="font-size:.7rem;color:#888">ปลูกต้นไม้</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>📊 สรุปกิจกรรม</h2>
+    <canvas id="barChart"></canvas>
+  </div>
+
+  <div class="setup" id="setup" style="display:none">
+    <b>ตั้งค่า:</b> วาง Web App URL ของ Apps Script
+    <input id="urlInput" placeholder="https://script.google.com/macros/s/XXXX/exec">
+  </div>
+</div>
+
+<script>
+  const LS_KEY = "boonloop_webapp_url";
+  let chart;
+
+  function getUrl() { return localStorage.getItem(LS_KEY) || ""; }
+
+  async function load() {
+    const url = getUrl();
+    if (!url) { document.getElementById("setup").style.display = "block"; return; }
+    document.getElementById("setup").style.display = "none";
+    try {
+      // ใช้ getAllMembers (admin) เพื่อรวมผลทั้งชุมชน — ต้องใส่ passcode ถ้าตั้งไว้
+      const pass = localStorage.getItem("boonloop_passcode") || "";
+      const res = await fetch(url + "?action=getAllMembers&passcode=" + encodeURIComponent(pass));
+      const json = await res.json();
+      const members = json.data || [];
+      // รวมยอดทั้งชุมชน
+      let totalBookings = 0, totalPoints = 0, totalEco = 0;
+      members.forEach(function(m) {
+        totalBookings += Number(m.total_bookings || 0);
+        totalPoints += Number(m.boon_points || 0);
+        totalEco += Number(m.eco_score || 0);
+      });
+      const waste = Math.round(totalBookings * 0.5 * 10) / 10;
+      const co2 = Math.round(totalBookings * 0.35 * 10) / 10;
+      render({ waste: waste, co2: co2, points: totalPoints, eco: totalEco,
+               bookings: totalBookings, members: members.length });
+    } catch (e) {
+      document.querySelector(".wrap").insertAdjacentHTML("afterbegin",
+        '<div class="err">โหลดข้อมูลไม่สำเร็จ: ' + e.message + '</div>');
+    }
+  }
+
+  function render(d) {
+    document.getElementById("heroWaste").innerHTML = d.waste + '<small> กก.</small>';
+    document.getElementById("cWaste").textContent = d.waste;
+    document.getElementById("cCo2").textContent = d.co2;
+    document.getElementById("cPoints").textContent = d.points.toLocaleString();
+    document.getElementById("eqBottle").textContent = Math.round(d.waste * 20) + " ขวด";
+    document.getElementById("eqTree").textContent = (Math.round(d.co2 / 9 * 10) / 10) + " ต้น";
+
+    const ctx = document.getElementById("barChart");
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: ["สมาชิก", "ครั้งที่ร่วม", "Eco Score"],
+        datasets: [{
+          data: [d.members, d.bookings, d.eco],
+          backgroundColor: ["#2E7D32", "#1565C0", "#F57F17"],
+          borderRadius: 8,
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  document.getElementById("urlInput").addEventListener("change", function(e) {
+    localStorage.setItem(LS_KEY, e.target.value.trim());
+    load();
+  });
+
+  load();
+</script>
+</body>
+</html>
