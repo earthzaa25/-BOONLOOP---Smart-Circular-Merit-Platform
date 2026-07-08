@@ -18,13 +18,23 @@ _MEMBER_TTL = 30  # วินาที
 def _call(payload: dict) -> dict:
     if not WEBAPP_URL:
         raise ValueError("SHEETS_WEBAPP_URL not set")
-    try:
-        res = requests.post(WEBAPP_URL, json=payload, timeout=15)
-        res.raise_for_status()
-        return res.json()
-    except Exception as e:
-        logger.error(f"Sheets API error: {e}")
-        raise
+    last_err = None
+    # ลองสูงสุด 2 ครั้ง เผื่อ Apps Script อืดชั่วคราว
+    for attempt in range(2):
+        try:
+            res = requests.post(WEBAPP_URL, json=payload, timeout=30)
+            res.raise_for_status()
+            return res.json()
+        except requests.exceptions.Timeout as e:
+            last_err = e
+            logger.warning(f"Sheets timeout (ครั้งที่ {attempt + 1}), ลองใหม่...")
+            continue
+        except Exception as e:
+            last_err = e
+            logger.error(f"Sheets API error: {e}")
+            raise
+    logger.error(f"Sheets API error หลัง retry: {last_err}")
+    raise last_err
 
 
 def _invalidate_member(line_user_id: str):
