@@ -4,9 +4,9 @@ from services.sheets_service import _call
 
 logger = logging.getLogger(__name__)
 
-# cache แบบง่าย (ลดการเรียก Sheet ระหว่างจอง 1 ครั้ง)
+# cache แบบง่าย (ลดการเรียก Sheet ระหว่างจอง)
 _cache = {}
-_CACHE_TTL = 60  # วินาที
+_CACHE_TTL = 180  # วินาที (3 นาที) — ชุดบุญ/ตัวเลือกไม่ค่อยเปลี่ยนบ่อย
 
 
 def _cached(key, fetch_fn):
