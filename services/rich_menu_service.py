@@ -70,7 +70,7 @@ def setup_rich_menu(line_bot_api: MessagingApi, blob_api: MessagingApiBlob = Non
                 blob_api.set_rich_menu_image(
                     rich_menu_id=rich_menu_id,
                     body=bytearray(f.read()),
-                    _headers={"Content-Type": "image/jpeg"},
+                    _content_type="image/jpeg",
                 )
             logger.info("Rich Menu image uploaded")
         else:
@@ -81,3 +81,4 @@ def setup_rich_menu(line_bot_api: MessagingApi, blob_api: MessagingApiBlob = Non
         return rich_menu_id
     except Exception as e:
         logger.error(f"setup_rich_menu error: {e}")
+        raise
