@@ -1,4 +1,5 @@
 import os
+import time
 import logging
 import requests
 
@@ -8,6 +9,10 @@ WEBAPP_URL = os.environ.get(
     "SHEETS_WEBAPP_URL",
     "https://script.google.com/macros/s/AKfycbxlEf9TdN0qPD_L8z-O-IMaT8BPPNJhbuZRGx0ktUFtZkdBZicFIYLGWJfEeLSWBdlc/exec"
 )
+
+# cache ข้อมูลสมาชิก (ลดการเรียก Sheet ซ้ำ)
+_member_cache = {}
+_MEMBER_TTL = 30  # วินาที
 
 
 def _call(payload: dict) -> dict:
@@ -22,9 +27,20 @@ def _call(payload: dict) -> dict:
         raise
 
 
-def get_member(line_user_id: str) -> dict | None:
+def _invalidate_member(line_user_id: str):
+    _member_cache.pop(line_user_id, None)
+
+
+def get_member(line_user_id: str, use_cache: bool = True) -> dict | None:
+    now = time.time()
+    if use_cache:
+        entry = _member_cache.get(line_user_id)
+        if entry and now - entry[0] < _MEMBER_TTL:
+            return entry[1]
     result = _call({"action": "getMember", "line_user_id": line_user_id})
-    return result.get("data")
+    data = result.get("data")
+    _member_cache[line_user_id] = (now, data)
+    return data
 
 
 def register_member(line_user_id: str, display_name: str) -> dict:
@@ -35,6 +51,7 @@ def register_member(line_user_id: str, display_name: str) -> dict:
     })
     if not result.get("success"):
         raise Exception(result.get("error", "register failed"))
+    _invalidate_member(line_user_id)
     return result.get("data")
 
 
@@ -53,6 +70,7 @@ def create_booking(line_user_id: str, package_type: str, package_name: str,
     })
     if not result.get("success"):
         raise Exception(result.get("error", "booking failed"))
+    _invalidate_member(line_user_id)
     return result.get("booking_id")
 
 
@@ -64,6 +82,7 @@ def add_points(line_user_id: str, points: int, eco_score: int, reason: str):
         "eco_score": eco_score,
         "reason": reason
     })
+    _invalidate_member(line_user_id)
 
 
 def get_points_summary(line_user_id: str) -> dict:
@@ -137,10 +156,12 @@ def get_returnable(line_user_id: str) -> list:
 
 
 def return_equipment(booking_id: str, line_user_id: str, donate: bool) -> dict:
-    return _call({
+    result = _call({
         "action": "returnEquipment", "booking_id": booking_id,
         "line_user_id": line_user_id, "donate": donate
     })
+    _invalidate_member(line_user_id)
+    return result
 
 
 def get_eco_stats(line_user_id: str) -> dict:
