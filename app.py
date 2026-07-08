@@ -49,6 +49,20 @@ def qr_image():
     return send_file(qr_path, mimetype="image/jpeg")
 
 
+@app.route("/setup-richmenu", methods=["GET"])
+def setup_richmenu_route():
+    """เรียกครั้งเดียวเพื่อสร้าง Rich Menu พร้อมรูป (เปิด URL นี้ในเบราว์เซอร์)"""
+    try:
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            blob_api = MessagingApiBlob(api_client)
+            rid = setup_rich_menu(line_bot_api, blob_api)
+        return {"status": "ok", "rich_menu_id": rid}
+    except Exception as e:
+        logger.error(f"setup richmenu route error: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+
 def _show_loading(line_bot_api, event, seconds=15):
     """แสดงจุดกำลังพิมพ์ (loading) ให้ผู้ใช้รู้ว่าระบบกำลังทำงาน"""
     try:
@@ -97,5 +111,6 @@ if __name__ == "__main__":
     # สร้าง Rich Menu เมื่อรัน server ครั้งแรก
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
-        setup_rich_menu(line_bot_api)
+        blob_api = MessagingApiBlob(api_client)
+        setup_rich_menu(line_bot_api, blob_api)
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
