@@ -3,7 +3,7 @@ import logging
 from flask import Flask, request, abort, send_file
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, MessagingApiBlob
+from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, MessagingApiBlob, ShowLoadingAnimationRequest
 from linebot.v3.webhooks import (
     MessageEvent, TextMessageContent, ImageMessageContent, FollowEvent, PostbackEvent,
 )
@@ -49,6 +49,18 @@ def qr_image():
     return send_file(qr_path, mimetype="image/jpeg")
 
 
+def _show_loading(line_bot_api, event, seconds=15):
+    """แสดงจุดกำลังพิมพ์ (loading) ให้ผู้ใช้รู้ว่าระบบกำลังทำงาน"""
+    try:
+        user_id = getattr(event.source, "user_id", None)
+        if user_id:
+            line_bot_api.show_loading_animation(
+                ShowLoadingAnimationRequest(chat_id=user_id, loading_seconds=seconds)
+            )
+    except Exception:
+        pass  # ถ้าแสดง loading ไม่ได้ ไม่ต้องหยุดการทำงาน
+
+
 @handler.add(FollowEvent)
 def on_follow(event):
     with ApiClient(configuration) as api_client:
@@ -60,6 +72,7 @@ def on_follow(event):
 def on_message(event):
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
+        _show_loading(line_bot_api, event)
         handle_text_message(event, line_bot_api)
 
 
@@ -67,6 +80,7 @@ def on_message(event):
 def on_postback(event):
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
+        _show_loading(line_bot_api, event)
         handle_postback(event, line_bot_api)
 
 
@@ -75,6 +89,7 @@ def on_image(event):
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         blob_api = MessagingApiBlob(api_client)
+        _show_loading(line_bot_api, event, seconds=20)  # อ่านสลิปใช้เวลานานกว่า
         handle_image_message(event, line_bot_api, blob_api)
 
 
