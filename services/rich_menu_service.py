@@ -49,6 +49,15 @@ RICH_MENU_AREAS = [
 def setup_rich_menu(line_bot_api: MessagingApi, blob_api: MessagingApiBlob = None):
     """สร้าง Rich Menu พร้อมรูปพื้นหลัง และตั้งเป็น default"""
     try:
+        # ลบ Rich Menu เก่าทั้งหมดก่อน (กันสร้างซ้ำเมื่อเรียกหลายครั้ง)
+        try:
+            existing = line_bot_api.get_rich_menu_list()
+            for rm in existing.richmenus:
+                line_bot_api.delete_rich_menu(rich_menu_id=rm.rich_menu_id)
+            logger.info(f"ลบ Rich Menu เก่า {len(existing.richmenus)} อัน")
+        except Exception as e:
+            logger.warning(f"ลบ Rich Menu เก่าไม่สำเร็จ: {e}")
+
         rich_menu_request = RichMenuRequest(
             size=RichMenuSize(width=2500, height=1686),
             selected=True,
@@ -66,12 +75,12 @@ def setup_rich_menu(line_bot_api: MessagingApi, blob_api: MessagingApiBlob = Non
             "rich_menu_bg.jpg",
         )
         if blob_api and os.path.exists(img_path):
-            with open(img_path, "rb") as f:
-                blob_api.set_rich_menu_image(
-                    rich_menu_id=rich_menu_id,
-                    body=bytearray(f.read()),
-                    _content_type="image/jpeg",
-                )
+            # ส่ง path (string) ให้ SDK อ่านไฟล์เอง — ถ้าส่ง bytes จะ error JSON
+            blob_api.set_rich_menu_image(
+                rich_menu_id=rich_menu_id,
+                body=img_path,
+                _content_type="image/jpeg",
+            )
             logger.info("Rich Menu image uploaded")
         else:
             logger.warning(f"Rich Menu image not found at {img_path}")
