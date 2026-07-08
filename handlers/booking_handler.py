@@ -9,8 +9,9 @@ from linebot.v3.messaging import (
 
 from config.constants import MERIT_PACKAGES
 from services.sheets_service import (
-    get_member, set_session, get_session, clear_session, create_booking,
+    get_member, create_booking,
 )
+from services.session_store import set_session, get_session, clear_session
 from services.content_service import get_packages, get_options, find_category
 from utils.promptpay import get_qr_url, is_static_qr, get_static_qr_url
 from utils.booking_flex import (
