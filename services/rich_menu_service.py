@@ -1,5 +1,6 @@
 import os
 import logging
+import requests
 from linebot.v3.messaging import (
     MessagingApi,
     MessagingApiBlob,
@@ -69,18 +70,26 @@ def setup_rich_menu(line_bot_api: MessagingApi, blob_api: MessagingApiBlob = Non
             rich_menu_request=rich_menu_request
         ).rich_menu_id
 
-        # อัปโหลดรูปพื้นหลัง
+        # อัปโหลดรูปพื้นหลัง — เรียก LINE API ตรงๆ ด้วย requests (SDK มีปัญหากับ bytes)
         img_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "rich_menu_bg.jpg",
         )
-        if blob_api and os.path.exists(img_path):
-            # ส่ง path (string) ให้ SDK อ่านไฟล์เอง — ถ้าส่ง bytes จะ error JSON
-            blob_api.set_rich_menu_image(
-                rich_menu_id=rich_menu_id,
-                body=img_path,
-                _content_type="image/jpeg",
+        if os.path.exists(img_path):
+            token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+            with open(img_path, "rb") as f:
+                img_bytes = f.read()
+            upload_res = requests.post(
+                f"https://api-data.line.me/v2/bot/richmenu/{rich_menu_id}/content",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "image/jpeg",
+                },
+                data=img_bytes,
+                timeout=30,
             )
+            if upload_res.status_code != 200:
+                raise Exception(f"อัปโหลดรูปไม่สำเร็จ ({upload_res.status_code}): {upload_res.text}")
             logger.info("Rich Menu image uploaded")
         else:
             logger.warning(f"Rich Menu image not found at {img_path}")
