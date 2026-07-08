@@ -53,7 +53,7 @@ def setup_rich_menu(line_bot_api: MessagingApi, blob_api: MessagingApiBlob = Non
             size=RichMenuSize(width=2500, height=1686),
             selected=True,
             name="BoonLoop Main Menu",
-            chat_bar_text="เมนู BoonLoop 🌿",
+            chat_bar_text="เมนู BoonLoop",
             areas=RICH_MENU_AREAS,
         )
         rich_menu_id = line_bot_api.create_rich_menu(
