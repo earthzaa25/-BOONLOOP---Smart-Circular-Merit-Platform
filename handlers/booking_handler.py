@@ -12,7 +12,7 @@ from services.sheets_service import (
     get_member, create_booking,
 )
 from services.session_store import set_session, get_session, clear_session
-from services.content_service import get_packages, get_options, find_category
+from services.content_service import get_packages, get_options, find_category, get_events
 from utils.promptpay import get_qr_url, is_static_qr, get_static_qr_url
 from utils.reply import safe_reply
 from utils.booking_flex import (
@@ -134,7 +134,7 @@ def _step_date(user_id, item_idx, session_data, reply_token, line_bot_api):
     session_data["price"] = item["price"]
     session_data["eco_score"] = item["eco_score"]
     set_session(user_id, STEP_SELECT_DATE, session_data)
-    flex = build_date_picker_flex()
+    flex = build_date_picker_flex(get_events())
     safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
