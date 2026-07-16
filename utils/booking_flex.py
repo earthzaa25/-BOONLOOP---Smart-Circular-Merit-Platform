@@ -1,6 +1,18 @@
 from datetime import datetime, timedelta
 from linebot.v3.messaging import FlexMessage, FlexContainer
 
+# LINE จำกัดความยาว label ของปุ่มไว้ที่ 40 ตัวอักษร
+# ถ้าเกิน LINE จะปฏิเสธทั้งข้อความ (ผู้ใช้จะไม่เห็นอะไรเลย)
+LABEL_MAX = 40
+
+
+def _fit(text, limit=LABEL_MAX):
+    """ตัดข้อความให้พอดีกับลิมิตของ LINE"""
+    text = str(text or "")
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
+
 
 def _flex(alt_text, contents):
     return FlexMessage(alt_text=alt_text, contents=FlexContainer.from_dict(contents))
@@ -12,9 +24,9 @@ def _pb(label, step, value, color="#2E7D32"):
         "type": "button",
         "action": {
             "type": "postback",
-            "label": label,
+            "label": _fit(label),
             "data": f"action=booking&step={step}&value={value}",
-            "displayText": label,
+            "displayText": _fit(label, 300),
         },
         "style": "primary",
         "color": color,
@@ -72,8 +84,10 @@ def build_package_type_flex(packages):
 def build_package_items_flex(cat):
     buttons = []
     for idx, item in enumerate(cat["items"]):
-        label = f"{item['name']} - {item['price']} บาท"
-        buttons.append(_pb(label, "item", str(idx), "#2E7D32"))
+        # ตัดเฉพาะชื่อ เพื่อให้ราคาแสดงครบเสมอ
+        price_part = f" - {item['price']} บาท"
+        name = _fit(item["name"], LABEL_MAX - len(price_part))
+        buttons.append(_pb(f"{name}{price_part}", "item", str(idx), "#2E7D32"))
     buttons.append(_cancel_button())
     contents = {
         "type": "bubble",
