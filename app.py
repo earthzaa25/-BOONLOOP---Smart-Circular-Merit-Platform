@@ -37,7 +37,15 @@ def webhook():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return {"status": "ok", "project": "BoonLoop"}
+    # ตรวจว่า Railway รันโค้ดเวอร์ชันไหน (ไว้เช็คว่า deploy ใหม่ขึ้นจริงไหม)
+    import importlib.util
+    return {
+        "status": "ok",
+        "project": "BoonLoop",
+        "version": "2026-07-08-fix-postback",
+        "has_reply_helper": importlib.util.find_spec("utils.reply") is not None,
+        "has_session_store": importlib.util.find_spec("services.session_store") is not None,
+    }
 
 
 @app.route("/qr", methods=["GET"])
