@@ -14,6 +14,7 @@ from services.sheets_service import (
 from services.session_store import set_session, get_session, clear_session
 from services.content_service import get_packages, get_options, find_category
 from utils.promptpay import get_qr_url, is_static_qr, get_static_qr_url
+from utils.reply import safe_reply
 from utils.booking_flex import (
     build_package_type_flex,
     build_package_items_flex,
@@ -43,29 +44,17 @@ def start_booking(user_id, reply_token, line_bot_api):
     """เริ่มการจอง — Step 1: เลือกประเภทชุด (ดึงจาก Google Sheet)"""
     member = get_member(user_id)
     if not member:
-        line_bot_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text="กรุณาสมัครสมาชิกก่อนนะคะ พิมพ์ 'สมัคร' 🙏")],
-            )
-        )
+        safe_reply(line_bot_api, reply_token, [TextMessage(text="กรุณาสมัครสมาชิกก่อนนะคะ พิมพ์ 'สมัคร' 🙏")], user_id)
         return
 
     packages = get_packages()
     if not packages:
-        line_bot_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text="ขณะนี้ยังไม่มีกิจกรรมเปิดให้จอง กรุณาติดตามข่าวสารเร็วๆ นี้ 🙏")],
-            )
-        )
+        safe_reply(line_bot_api, reply_token, [TextMessage(text="ขณะนี้ยังไม่มีกิจกรรมเปิดให้จอง กรุณาติดตามข่าวสารเร็วๆ นี้ 🙏")], user_id)
         return
 
     set_session(user_id, STEP_SELECT_TYPE, {})
     flex = build_package_type_flex(packages)
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
 def handle_booking_postback(user_id, data: dict, reply_token, line_bot_api):
@@ -98,21 +87,11 @@ def handle_booking_postback(user_id, data: dict, reply_token, line_bot_api):
             _finalize_booking(user_id, value, session_data, reply_token, line_bot_api)
         elif step == "cancel":
             clear_session(user_id)
-            line_bot_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=reply_token,
-                    messages=[TextMessage(text="ยกเลิกการจองแล้ว 🙏 พิมพ์ 'ทำบุญ' เพื่อเริ่มใหม่")],
-                )
-            )
+            safe_reply(line_bot_api, reply_token, [TextMessage(text="ยกเลิกการจองแล้ว 🙏 พิมพ์ 'ทำบุญ' เพื่อเริ่มใหม่")], user_id)
     except Exception as e:
         logger.error(f"booking postback error: {e}")
         clear_session(user_id)
-        line_bot_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text="เกิดข้อผิดพลาด กรุณาเริ่มจองใหม่ พิมพ์ 'ทำบุญ' 🙏")],
-            )
-        )
+        safe_reply(line_bot_api, reply_token, [TextMessage(text="เกิดข้อผิดพลาด กรุณาเริ่มจองใหม่ พิมพ์ 'ทำบุญ' 🙏")], user_id)
 
 
 # ─── Step 2: เลือกชุดในประเภทนั้น ───────────────
@@ -128,9 +107,7 @@ def _step_item(user_id, package_type, session_data, reply_token, line_bot_api):
     session_data["package_type"] = package_type
     set_session(user_id, STEP_SELECT_ITEM, session_data)
     flex = build_package_items_flex(cat)
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
 # ─── Step 3: เลือกวันรับ ────────────────────────
@@ -150,9 +127,7 @@ def _step_date(user_id, item_idx, session_data, reply_token, line_bot_api):
     session_data["eco_score"] = item["eco_score"]
     set_session(user_id, STEP_SELECT_DATE, session_data)
     flex = build_date_picker_flex()
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
 # ─── Step 4: เลือกสถานที่ ───────────────────────
@@ -161,9 +136,7 @@ def _step_location(user_id, date_value, session_data, reply_token, line_bot_api)
     set_session(user_id, STEP_SELECT_LOCATION, session_data)
     locations = get_options().get("location", [])
     flex = build_location_flex(locations)
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
 # ─── Step 5: เลือกเวลา ──────────────────────────
@@ -174,9 +147,7 @@ def _step_time(user_id, location_idx, session_data, reply_token, line_bot_api):
     set_session(user_id, STEP_SELECT_TIME, session_data)
     time_slots = get_options().get("time", [])
     flex = build_time_flex(time_slots)
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
 # ─── Step 6: เลือกรูปแบบพิธี ─────────────────────
@@ -187,9 +158,7 @@ def _step_ceremony(user_id, time_idx, session_data, reply_token, line_bot_api):
     set_session(user_id, STEP_SELECT_CEREMONY, session_data)
     ceremonies = get_options().get("ceremony", [])
     flex = build_ceremony_flex(ceremonies)
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
 # ─── Step 7: เลือกการชำระเงิน ────────────────────
@@ -199,9 +168,7 @@ def _step_payment(user_id, ceremony_idx, session_data, reply_token, line_bot_api
     session_data["ceremony_type"] = ceremonies[idx] if idx < len(ceremonies) else ""
     set_session(user_id, STEP_SELECT_PAYMENT, session_data)
     flex = build_payment_flex()
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
 # ─── ยืนยันการจอง ───────────────────────────────
@@ -210,21 +177,14 @@ def _step_confirm(user_id, payment_method, session_data, reply_token, line_bot_a
     session_data["payment_method"] = payment_map.get(payment_method, payment_method)
     set_session(user_id, STEP_CONFIRM, session_data)
     flex = build_confirm_flex(session_data)
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=[flex])
-    )
+    safe_reply(line_bot_api, reply_token, [flex], user_id)
 
 
 # ─── บันทึกลง Sheet ─────────────────────────────
 def _finalize_booking(user_id, value, session_data, reply_token, line_bot_api):
     if value != "yes":
         clear_session(user_id)
-        line_bot_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=reply_token,
-                messages=[TextMessage(text="ยกเลิกการจองแล้ว 🙏")],
-            )
-        )
+        safe_reply(line_bot_api, reply_token, [TextMessage(text="ยกเลิกการจองแล้ว 🙏")], user_id)
         return
 
     booking_id = create_booking(
@@ -273,6 +233,4 @@ def _finalize_booking(user_id, value, session_data, reply_token, line_bot_api):
             text=f"💵 ชำระเงินสด {price} บาท ตอนรับชุดที่ {session_data.get('location', '')} 🙏"
         ))
 
-    line_bot_api.reply_message(
-        ReplyMessageRequest(reply_token=reply_token, messages=messages)
-    )
+    safe_reply(line_bot_api, reply_token, messages, user_id)
