@@ -6,6 +6,9 @@ from linebot.v3.messaging import FlexMessage, FlexContainer
 TH_TZ = ZoneInfo("Asia/Bangkok")
 TH_DAYS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]
 
+# จองล่วงหน้าได้กี่วัน (120 วัน = ครอบคลุมช่วงพรรษาทั้งหมด ถึงวันออกพรรษา)
+BOOK_AHEAD_DAYS = 120
+
 
 def _now_th():
     return datetime.now(TH_TZ)
@@ -209,23 +212,44 @@ def _cancel_bubble():
 
 
 # ─── Step 3: เลือกวันรับ ───────────────────────
-def build_date_picker_flex():
-    """เลือกวันรับ — ปุ่มลัดวันใกล้ๆ + ปฏิทินเลือกวันอื่นได้"""
+def build_date_picker_flex(events=None):
+    """เลือกวันรับ — วันสำคัญ + ปุ่มลัดวันใกล้ๆ + ปฏิทินเลือกวันอื่นได้"""
     buttons = []
     today = _now_th()
+    min_date = (today + timedelta(days=1)).date()
+    max_date = (today + timedelta(days=BOOK_AHEAD_DAYS)).date()
 
-    for i in range(1, 5):  # ปุ่มลัด 4 วันถัดไป
+    # ── วันสำคัญที่ยังมาไม่ถึง (อยู่ในช่วงที่จองได้) ──
+    specials = []
+    for ev in (events or []):
+        try:
+            ed = datetime.strptime(ev["date"], "%Y-%m-%d").date()
+        except (ValueError, KeyError, TypeError):
+            continue
+        if min_date <= ed <= max_date:
+            specials.append((ed, ev))
+    specials.sort(key=lambda x: x[0])
+
+    if specials:
+        buttons.append({
+            "type": "text", "text": "⭐ วันสำคัญ", "size": "xs",
+            "weight": "bold", "color": "#C8862C", "margin": "sm",
+        })
+        for ed, ev in specials[:3]:
+            value = ed.strftime("%d/%m/%Y")
+            label = f"{ev.get('emoji','⭐')} {ev.get('name','')} · {_th_day(ed)} {ed.strftime('%d/%m')}"
+            buttons.append(_pb(label, "date", value, "#C8862C"))
+        buttons.append({"type": "separator", "margin": "md"})
+
+    # ── ปุ่มลัดวันใกล้ๆ (ถ้ามีวันสำคัญแล้วโชว์น้อยลง กันปุ่มล้น) ──
+    quick = 2 if specials else 4
+    for i in range(1, quick + 1):
         d = today + timedelta(days=i)
         value = d.strftime("%d/%m/%Y")
-        if i == 1:
-            label = f"📅 พรุ่งนี้ ({_th_day(d)} {d.strftime('%d/%m')})"
-        else:
-            label = f"📅 {_th_day(d)} {d.strftime('%d/%m')}"
+        label = f"📅 พรุ่งนี้ ({_th_day(d)} {d.strftime('%d/%m')})" if i == 1 else f"📅 {_th_day(d)} {d.strftime('%d/%m')}"
         buttons.append(_pb(label, "date", value, "#1565C0"))
 
-    # ปฏิทินเลือกวันเอง
-    min_d = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-    max_d = (today + timedelta(days=90)).strftime("%Y-%m-%d")
+    # ── ปฏิทินเลือกวันเอง ──
     buttons.append({
         "type": "button",
         "action": {
@@ -233,9 +257,9 @@ def build_date_picker_flex():
             "label": "🗓️ เลือกวันอื่น",
             "data": "action=booking&step=date&value=picker",
             "mode": "date",
-            "initial": min_d,
-            "min": min_d,
-            "max": max_d,
+            "initial": min_date.strftime("%Y-%m-%d"),
+            "min": min_date.strftime("%Y-%m-%d"),
+            "max": max_date.strftime("%Y-%m-%d"),
         },
         "style": "secondary",
         "margin": "sm",
