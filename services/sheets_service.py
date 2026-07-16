@@ -15,25 +15,42 @@ _member_cache = {}
 _MEMBER_TTL = 30  # วินาที
 
 
+# เวลารอ Google Sheet — ต้องรวมแล้วไม่เกิน ~25 วิ
+# เพราะ LINE ให้เวลาตอบกลับจำกัด ถ้าช้ากว่านั้นจะตอบไม่ได้เลย
+_TIMEOUT = 10
+
+# action ที่ "อ่านอย่างเดียว" — ลองซ้ำได้ปลอดภัย
+# (action ที่เขียนข้อมูล ห้าม retry เด็ดขาด กันจองซ้ำ/คะแนนซ้ำ)
+_SAFE_TO_RETRY = {
+    "getMember", "getPackages", "getOptions", "getPointsSummary",
+    "getBooking", "getLatestPendingBooking", "getMyBookings",
+    "getReturnable", "getEcoStats", "getSession",
+}
+
+
 def _call(payload: dict) -> dict:
     if not WEBAPP_URL:
         raise ValueError("SHEETS_WEBAPP_URL not set")
+
+    action = payload.get("action", "")
+    attempts = 2 if action in _SAFE_TO_RETRY else 1
+
     last_err = None
-    # ลองสูงสุด 2 ครั้ง เผื่อ Apps Script อืดชั่วคราว
-    for attempt in range(2):
+    for i in range(attempts):
         try:
-            res = requests.post(WEBAPP_URL, json=payload, timeout=30)
+            res = requests.post(WEBAPP_URL, json=payload, timeout=_TIMEOUT)
             res.raise_for_status()
             return res.json()
         except requests.exceptions.Timeout as e:
             last_err = e
-            logger.warning(f"Sheets timeout (ครั้งที่ {attempt + 1}), ลองใหม่...")
-            continue
-        except Exception as e:
-            last_err = e
-            logger.error(f"Sheets API error: {e}")
+            if i + 1 < attempts:
+                logger.warning(f"Sheets timeout ({action}) ลองใหม่...")
+                continue
+            logger.error(f"Sheets timeout ({action}) หมดเวลา")
             raise
-    logger.error(f"Sheets API error หลัง retry: {last_err}")
+        except Exception as e:
+            logger.error(f"Sheets API error ({action}): {e}")
+            raise
     raise last_err
 
 
