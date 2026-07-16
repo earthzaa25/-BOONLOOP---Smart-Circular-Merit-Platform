@@ -50,3 +50,13 @@ def find_category(packages: list, category: str) -> dict | None:
 
 def clear_cache():
     _cache.clear()
+
+
+def _fetch_events():
+    result = _call({"action": "getEvents"})
+    return result.get("data", [])
+
+
+def get_events() -> list:
+    """คืนวันสำคัญที่ active — [{date: '2026-07-30', name: 'วันเข้าพรรษา', emoji: '🕯️'}]"""
+    return _cached("events", _fetch_events)
