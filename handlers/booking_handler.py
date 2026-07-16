@@ -65,6 +65,14 @@ def handle_booking_postback(user_id, data: dict, reply_token, line_bot_api):
     step = data.get("step")
     value = data.get("value")
 
+    # วันที่จากปฏิทินมาเป็น 2026-07-20 → แปลงเป็น 20/07/2026
+    picked = data.get("picked_date")
+    if step == "date" and picked:
+        try:
+            value = datetime.strptime(picked, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except ValueError:
+            logger.warning(f"รูปแบบวันที่ไม่ถูกต้อง: {picked}")
+
     session = get_session(user_id)
     session_data = session.get("session_data", {}) if session else {}
 
