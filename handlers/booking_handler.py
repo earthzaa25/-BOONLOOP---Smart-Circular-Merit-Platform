@@ -76,6 +76,16 @@ def handle_booking_postback(user_id, data: dict, reply_token, line_bot_api):
     session = get_session(user_id)
     session_data = session.get("session_data", {}) if session else {}
 
+    # ถ้าจองค้างไว้นานจน session หมดอายุ — บอกให้ชัด ไม่ใช่ error งงๆ
+    if step not in ("type", "cancel") and not session_data:
+        logger.warning(f"session หาย/หมดอายุ (user={user_id[:8]}… step={step})")
+        safe_reply(
+            line_bot_api, reply_token,
+            [TextMessage(text="การจองนี้หมดอายุแล้ว (เกิน 30 นาที)\nพิมพ์ 'ทำบุญ' เพื่อเริ่มจองใหม่ 🙏")],
+            user_id,
+        )
+        return
+
     try:
         if step == "type":
             _step_item(user_id, value, session_data, reply_token, line_bot_api)
