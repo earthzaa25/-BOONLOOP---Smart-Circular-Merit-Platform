@@ -17,6 +17,13 @@ def handle_postback(event: PostbackEvent, line_bot_api: MessagingApi):
     parsed = parse_qs(data_str)
     data = {k: v[0] for k, v in parsed.items()}
 
+    # ถ้าผู้ใช้เลือกวันจากปฏิทิน LINE จะส่งวันมาแยกใน params
+    params = getattr(event.postback, "params", None)
+    if params:
+        picked = params.get("date") if isinstance(params, dict) else getattr(params, "date", None)
+        if picked:
+            data["picked_date"] = picked
+
     action = data.get("action")
 
     if action == "booking":
