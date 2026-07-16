@@ -82,19 +82,116 @@ def build_package_type_flex(packages):
 
 # ─── Step 2: เลือกชุด (จาก Sheet, ใช้ index) ────
 def build_package_items_flex(cat):
-    buttons = []
-    for idx, item in enumerate(cat["items"]):
-        # ตัดเฉพาะชื่อ เพื่อให้ราคาแสดงครบเสมอ
-        price_part = f" - {item['price']} บาท"
-        name = _fit(item["name"], LABEL_MAX - len(price_part))
-        buttons.append(_pb(f"{name}{price_part}", "item", str(idx), "#2E7D32"))
-    buttons.append(_cancel_button())
-    contents = {
+    """การ์ดเลื่อน — แต่ละชุดแสดงรายละเอียดครบ (รูป/ของในชุด/Eco Score)"""
+    bubbles = []
+    for idx, item in enumerate(cat["items"][:11]):  # LINE จำกัด 12 การ์ด เผื่อการ์ดยกเลิก 1
+        bubbles.append(_package_bubble(cat, item, idx))
+    bubbles.append(_cancel_bubble())
+    return _flex("เลือกชุดบุญ", {"type": "carousel", "contents": bubbles})
+
+
+def _package_bubble(cat, item, idx):
+    body = [
+        {"type": "text", "text": _fit(item["name"], 60), "weight": "bold", "size": "lg", "wrap": True, "color": "#1B5E20"},
+        {
+            "type": "box", "layout": "baseline", "margin": "xs",
+            "contents": [
+                {"type": "text", "text": f"{item['price']}", "size": "xxl", "weight": "bold", "color": "#C8862C", "flex": 0},
+                {"type": "text", "text": " บาท", "size": "sm", "color": "#888888", "flex": 0, "margin": "xs"},
+            ],
+        },
+    ]
+
+    # คำอธิบายสั้น
+    desc = (item.get("description") or "").strip()
+    if desc:
+        body.append({"type": "separator", "margin": "md"})
+        body.append({"type": "text", "text": _fit(desc, 120), "size": "xs", "color": "#666666",
+                     "wrap": True, "margin": "md"})
+
+    # รายการของในชุด (คั่นด้วย |)
+    raw = (item.get("items_list") or "").strip()
+    parts = [p.strip() for p in raw.split("|") if p.strip()]
+    if parts:
+        body.append({"type": "separator", "margin": "md"})
+        body.append({"type": "text", "text": "ในชุดประกอบด้วย", "size": "xs",
+                     "weight": "bold", "color": "#2E7D32", "margin": "md"})
+        for p in parts[:6]:
+            body.append({
+                "type": "box", "layout": "baseline", "spacing": "sm", "margin": "xs",
+                "contents": [
+                    {"type": "text", "text": "•", "size": "xs", "color": "#2E7D32", "flex": 0},
+                    {"type": "text", "text": _fit(p, 40), "size": "xs", "color": "#555555", "wrap": True},
+                ],
+            })
+        if len(parts) > 6:
+            body.append({"type": "text", "text": f"และอีก {len(parts) - 6} รายการ",
+                         "size": "xxs", "color": "#AAAAAA", "margin": "xs"})
+
+    # Eco Score
+    body.append({"type": "separator", "margin": "md"})
+    body.append({
+        "type": "box", "layout": "baseline", "margin": "md",
+        "contents": [
+            {"type": "text", "text": "♻️", "size": "sm", "flex": 0},
+            {"type": "text", "text": f" Eco Score {item.get('eco_score', 0)}",
+             "size": "xs", "color": "#2E7D32", "weight": "bold"},
+        ],
+    })
+
+    bubble = {
         "type": "bubble",
-        "header": _header(f"{cat.get('emoji','')} {cat.get('name','')}".strip(), 2, "#2E7D32"),
-        "body": {"type": "box", "layout": "vertical", "spacing": "sm", "contents": buttons},
+        "size": "kilo",
+        "body": {"type": "box", "layout": "vertical", "spacing": "none", "contents": body},
+        "footer": {
+            "type": "box", "layout": "vertical",
+            "contents": [{
+                "type": "button", "style": "primary", "color": "#2E7D32", "height": "sm",
+                "action": {
+                    "type": "postback",
+                    "label": "เลือกชุดนี้",
+                    "data": f"action=booking&step=item&value={idx}",
+                    "displayText": _fit(f"เลือก {item['name']}", 300),
+                },
+            }],
+        },
     }
-    return _flex("เลือกชุดบุญ", contents)
+
+    # ใส่รูปถ้ามี (ต้องเป็น https)
+    img = (item.get("image_url") or "").strip()
+    if img.startswith("https://"):
+        bubble["hero"] = {
+            "type": "image", "url": img, "size": "full",
+            "aspectRatio": "20:13", "aspectMode": "cover",
+        }
+    return bubble
+
+
+def _cancel_bubble():
+    return {
+        "type": "bubble",
+        "size": "kilo",
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "md",
+            "justifyContent": "center",
+            "contents": [
+                {"type": "text", "text": "🙏", "size": "xxl", "align": "center"},
+                {"type": "text", "text": "ยังไม่เลือกตอนนี้", "size": "sm",
+                 "color": "#888888", "align": "center", "wrap": True},
+            ],
+        },
+        "footer": {
+            "type": "box", "layout": "vertical",
+            "contents": [{
+                "type": "button", "style": "secondary", "height": "sm",
+                "action": {
+                    "type": "postback", "label": "❌ ยกเลิก",
+                    "data": "action=booking&step=cancel&value=cancel",
+                    "displayText": "ยกเลิกการจอง",
+                },
+            }],
+        },
+    }
 
 
 # ─── Step 3: เลือกวันรับ ───────────────────────
