@@ -1,5 +1,19 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from linebot.v3.messaging import FlexMessage, FlexContainer
+
+# server รันด้วยเวลา UTC — ต้องแปลงเป็นเวลาไทย ไม่งั้นวันที่จะเพี้ยน
+TH_TZ = ZoneInfo("Asia/Bangkok")
+TH_DAYS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]
+
+
+def _now_th():
+    return datetime.now(TH_TZ)
+
+
+def _th_day(d):
+    return TH_DAYS[d.weekday()]
+
 
 # LINE จำกัดความยาว label ของปุ่มไว้ที่ 40 ตัวอักษร
 # ถ้าเกิน LINE จะปฏิเสธทั้งข้อความ (ผู้ใช้จะไม่เห็นอะไรเลย)
@@ -196,12 +210,37 @@ def _cancel_bubble():
 
 # ─── Step 3: เลือกวันรับ ───────────────────────
 def build_date_picker_flex():
+    """เลือกวันรับ — ปุ่มลัดวันใกล้ๆ + ปฏิทินเลือกวันอื่นได้"""
     buttons = []
-    today = datetime.now()
-    for i in range(1, 6):  # 5 วันถัดไป
+    today = _now_th()
+
+    for i in range(1, 5):  # ปุ่มลัด 4 วันถัดไป
         d = today + timedelta(days=i)
-        thai_date = d.strftime("%d/%m/%Y")
-        buttons.append(_pb(f"📅 {thai_date}", "date", thai_date, "#1565C0"))
+        value = d.strftime("%d/%m/%Y")
+        if i == 1:
+            label = f"📅 พรุ่งนี้ ({_th_day(d)} {d.strftime('%d/%m')})"
+        else:
+            label = f"📅 {_th_day(d)} {d.strftime('%d/%m')}"
+        buttons.append(_pb(label, "date", value, "#1565C0"))
+
+    # ปฏิทินเลือกวันเอง
+    min_d = (today + timedelta(days=1)).strftime("%Y-%m-%d")
+    max_d = (today + timedelta(days=90)).strftime("%Y-%m-%d")
+    buttons.append({
+        "type": "button",
+        "action": {
+            "type": "datetimepicker",
+            "label": "🗓️ เลือกวันอื่น",
+            "data": "action=booking&step=date&value=picker",
+            "mode": "date",
+            "initial": min_d,
+            "min": min_d,
+            "max": max_d,
+        },
+        "style": "secondary",
+        "margin": "sm",
+    })
+
     buttons.append(_cancel_button())
     contents = {
         "type": "bubble",
